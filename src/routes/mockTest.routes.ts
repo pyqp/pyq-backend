@@ -1,18 +1,20 @@
 import { Router } from 'express';
 import mockTestController from '../controllers/mockTest.controller';
 import { protect, authorize } from '../middleware/auth.middleware';
+import { cache } from '../middleware/cache.middleware';
+import { testLimiter } from '../middleware/rateLimiter.middleware';
 
 const router = Router();
 
-// ─── Public ───────────────────────────────────────────────────────────────────
-router.get('/',           mockTestController.getAllMockTests);
-router.get('/:id',        mockTestController.getMockTestById);
+// ─── Public (cached) ──────────────────────────────────────────────────────────
+router.get('/',    cache(180), mockTestController.getAllMockTests);
+router.get('/:id', cache(300), mockTestController.getMockTestById);
 
-// ─── Protected (logged-in users) ──────────────────────────────────────────────
-router.post('/:id/start',      protect, mockTestController.startMockTest);
-router.patch('/:id/save-answer', protect, mockTestController.saveAnswer);
-router.post('/:id/submit',     protect, mockTestController.submitMockTest);
-router.get('/:id/my-attempts', protect, mockTestController.getMyAttempts);
+// ─── Protected ────────────────────────────────────────────────────────────────
+router.post('/:id/start',        protect, testLimiter, mockTestController.startMockTest);
+router.patch('/:id/save-answer', protect,              mockTestController.saveAnswer);
+router.post('/:id/submit',       protect,              mockTestController.submitMockTest);
+router.get('/:id/my-attempts',   protect,              mockTestController.getMyAttempts);
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 router.post('/',    protect, authorize('admin'), mockTestController.createMockTest);

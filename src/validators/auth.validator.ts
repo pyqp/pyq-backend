@@ -88,3 +88,16 @@ export const changePasswordValidator = [
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage('New password must contain at least one uppercase letter, one lowercase letter, and one number'),
 ];
+
+/**
+ * Forgot password validation
+ */
+export const forgotPasswordValidator = [
+  body('email')
+    .trim()
+    .notEmpty()
+    .withMessage('Email is required')
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .normalizeEmail(),
+];

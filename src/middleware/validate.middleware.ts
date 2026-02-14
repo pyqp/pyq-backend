@@ -1,33 +1,26 @@
 import { Request, Response, NextFunction } from 'express';
-import { validationResult, ValidationChain } from 'express-validator';
-// import ApiError from '../utils/ApiError';
+import { validationResult } from 'express-validator';
 
 /**
- * Validate request using express-validator
+ * Reads validation errors populated by express-validator chains.
+ * Usage in routes: router.post('/', [validator1, validator2], validate, controller)
  */
-export const validate = (validations: ValidationChain[]) => {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    // Run all validations
-    await Promise.all(validations.map(validation => validation.run(req)));
+export const validate = (req: Request, res: Response, next: NextFunction): void => {
+  const errors = validationResult(req);
 
-    // Check for errors
-    const errors = validationResult(req);
+  if (errors.isEmpty()) {
+    next();
+    return;
+  }
 
-    if (errors.isEmpty()) {
-      return next();
-    }
+  const formattedErrors = errors.array().map(err => ({
+    field: err.type === 'field' ? (err as any).path : 'unknown',
+    message: err.msg,
+  }));
 
-    // Format errors
-    const formattedErrors = errors.array().map(err => ({
-      field: err.type === 'field' ? (err as any).path : 'unknown',
-      message: err.msg,
-    }));
-
-    // Send error response
-    res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors: formattedErrors,
-    });
-  };
+  res.status(400).json({
+    success: false,
+    message: 'Validation failed',
+    errors: formattedErrors,
+  });
 };

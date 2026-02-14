@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import User from '../models/User.model';
+import Result from '../models/Result.model';
 import ApiError from '../utils/ApiError';
 import ApiResponse from '../utils/ApiResponse';
 import asyncHandler from '../utils/asyncHandler';
@@ -34,7 +35,7 @@ export const getProfile = asyncHandler(async (req: AuthRequest, res: Response) =
       referralStats: user.referralStats,
       preferences: user.preferences,
       stats: user.stats,
-      createdAt: user.createdAt
+      createdAt: user.createdAt,
     },
     'Profile fetched successfully'
   );
@@ -169,18 +170,22 @@ export const getDashboard = asyncHandler(async (req: AuthRequest, res: Response)
  * @route   GET /api/v1/users/test-history
  * @access  Private
  */
-export const getTestHistory = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // This will be implemented when we create TestAttempt model
-  // For now, return empty array
+export const getTestHistory = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { page = '1', limit = '10' } = req.query;
+  const pageNum  = parseInt(page as string, 10);
+  const limitNum = parseInt(limit as string, 10);
+  const skip     = (pageNum - 1) * limitNum;
 
-  ApiResponse.success(
-    res,
-    {
-      tests: [],
-      total: 0,
-    },
-    'Test history fetched successfully'
-  );
+  const results = await Result.find({ user: req.user!._id })
+    .populate('mockTest', 'name slug difficulty exam')
+    .sort('-createdAt')
+    .skip(skip)
+    .limit(limitNum)
+    .select('finalScore totalMarks percentage rank percentile accuracy timeTaken attemptNumber isFirstAttempt createdAt mockTest');
+
+  const total = await Result.countDocuments({ user: req.user!._id });
+
+  ApiResponse.paginated(res, results, pageNum, limitNum, total, 'Test history fetched successfully');
 });
 
 /**

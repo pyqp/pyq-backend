@@ -1,14 +1,40 @@
 import { Router } from 'express';
-import authRoutes from './auth.routes';
-import userRoutes from './user.routes';
-import examRoutes from './exam.routes';
-import packageRoutes from './Package.routes';
+import authRoutes      from './auth.routes';
+import userRoutes      from './user.routes';
+import examRoutes      from './exam.routes';
+import packageRoutes   from './Package.routes';
+import mockTestRoutes  from './mockTest.routes';
+import resultRoutes    from './result.routes';
+import rankingRoutes   from './ranking.routes';
+import paymentRoutes   from './payment.routes';
+import creditRoutes    from './credit.routes';
+import referralRoutes  from './Referral.routes';
+import offerRoutes     from './Offer.routes';
+import adminRoutes     from './admin.routes';
+import contactRoutes   from './contact.routes';
+import refundRoutes    from './refund.routes';
+import blogRoutes      from './blog.routes';
+import pyqRoutes       from './pyq.routes';
+import careerRoutes    from './career.routes';
 
 const router = Router();
 
-router.use('/auth', authRoutes);
-router.use('/users', userRoutes);
-router.use('/exams', examRoutes);
-router.use('/packages', packageRoutes);
+router.use('/auth',       authRoutes);
+router.use('/users',      userRoutes);
+router.use('/exams',      examRoutes);
+router.use('/packages',   packageRoutes);
+router.use('/mock-tests', mockTestRoutes);
+router.use('/results',    resultRoutes);
+router.use('/rankings',   rankingRoutes);
+router.use('/payments',   paymentRoutes);
+router.use('/credits',    creditRoutes);
+router.use('/referrals',  referralRoutes);
+router.use('/offers',     offerRoutes);
+router.use('/admin',      adminRoutes);
+router.use('/contact',    contactRoutes);
+router.use('/refunds',    refundRoutes);
+router.use('/blog',       blogRoutes);
+router.use('/pyqs',       pyqRoutes);
+router.use('/careers',    careerRoutes);
 
 export default router;
