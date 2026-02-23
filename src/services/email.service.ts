@@ -12,20 +12,29 @@ interface EmailOptions {
  * Send email
  */
 export const sendEmail = async (options: EmailOptions): Promise<void> => {
+  // Skip silently if email is not configured (local dev)
+  const configured = !!(process.env.SMTP_USER || process.env.EMAIL_USERNAME);
+  if (!configured) {
+    logger.info(`[Email skipped — not configured] To: ${options.email} | Subject: ${options.subject}`);
+    return;
+  }
+
   try {
     const mailOptions = {
-      from: process.env.EMAIL_FROM || 'PYQPB <noreply@pyqpb.com>',
+      from: process.env.FROM_EMAIL
+        ? `${process.env.FROM_NAME || 'PYQPB'} <${process.env.FROM_EMAIL}>`
+        : 'PYQPB <noreply@pyqpb.com>',
       to: options.email,
       subject: options.subject,
       text: options.message,
       html: options.html || options.message,
     };
-    
+
     await transporter.sendMail(mailOptions);
     logger.info(`Email sent to ${options.email}`);
   } catch (error: any) {
     logger.error(`Error sending email: ${error.message}`);
-    throw new Error('Email could not be sent');
+    // Do NOT re-throw — email failure should never break register/login
   }
 };
 

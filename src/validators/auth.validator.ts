@@ -25,12 +25,21 @@ export const registerValidator = [
     .isLength({ min: 6 })
     .withMessage('Password must be at least 6 characters')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+    .withMessage('Password must contain uppercase, lowercase and a number (e.g. Test@1234)'),
 
   body('phone')
     .optional()
+    .customSanitizer((val: string) => {
+      if (!val) return val;
+      // Strip spaces, dashes, dots, parentheses
+      const cleaned = val.replace(/[\s\-().]/g, '');
+      // Strip +91 or 91 country code prefix
+      if (cleaned.startsWith('+91')) return cleaned.slice(3);
+      if (cleaned.startsWith('91') && cleaned.length === 12) return cleaned.slice(2);
+      return cleaned;
+    })
     .matches(/^[6-9]\d{9}$/)
-    .withMessage('Please provide a valid Indian phone number'),
+    .withMessage('Please provide a valid 10-digit Indian mobile number (e.g. 9876543210)'),
 ];
 
 /**
@@ -71,7 +80,7 @@ export const resetPasswordValidator = [
     .isLength({ min: 6 })
     .withMessage('Password must be at least 6 characters')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+    .withMessage('Password must contain uppercase, lowercase and a number (e.g. Test@1234)'),
 ];
 
 /**

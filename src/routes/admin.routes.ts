@@ -18,8 +18,8 @@ router.get('/analytics/tests',   adminController.getTestAnalytics);
 // ─── User Management ──────────────────────────────────────────────────────────
 router.get('/users',                        adminController.listUsers);
 router.get('/users/:id',                    adminController.getUserDetails);
-router.patch('/users/:id/toggle-status',    adminController.toggleUserStatus);
-router.post('/users/:id/grant-credits',     adminController.grantCredits);
+router.patch('/users/:id/toggle-status',    adminController.toggleUserStatus);  // ✅ PATCH
+router.post('/users/:id/grant-credits',     adminController.grantCredits);      // ✅ POST
 
 // ─── Question Management ──────────────────────────────────────────────────────
 router.get('/questions',              adminController.listQuestions);

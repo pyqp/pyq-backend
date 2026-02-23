@@ -39,7 +39,8 @@ const packageSchema = new Schema<IPackageDocument>(
       unique: true,
       trim: true,
       uppercase: true,
-      enum: ['BASIC', 'BEST_VALUE', 'PREMIUM'],
+      // ── UPDATED: matches new business tiers ─────────────────────────────
+      enum: ['STARTER', 'VALUE', 'PRO'],
     },
     displayName: {
       type: String,
@@ -69,9 +70,7 @@ const packageSchema = new Schema<IPackageDocument>(
       type: [String],
       required: true,
       validate: {
-        validator: function (v: string[]) {
-          return v && v.length > 0;
-        },
+        validator: (v: string[]) => v && v.length > 0,
         message: 'Package must have at least one feature',
       },
     },
@@ -80,74 +79,49 @@ const packageSchema = new Schema<IPackageDocument>(
       required: [true, 'Please provide description'],
       maxlength: [500, 'Description cannot be more than 500 characters'],
     },
-    isPopular: {
-      type: Boolean,
-      default: false,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-    savings: {
-      type: Number,
-      default: 0,
-    },
+    isPopular: { type: Boolean, default: false },
+    isActive:  { type: Boolean, default: true  },
+    savings:   { type: Number,  default: 0     },
     badge: {
       type: String,
-      enum: ['BEST SELLER', 'MOST POPULAR', 'BEST VALUE', 'RECOMMENDED', ''],
+      enum: ['BEST SELLER', 'MOST POPULAR', 'BEST VALUE', 'BEST DEAL', 'RECOMMENDED', ''],
       default: '',
     },
-    color: {
-      type: String,
-      default: '#4F46E5',
-    },
-    orderPriority: {
-      type: Number,
-      default: 0,
-    },
+    color:         { type: String, default: '#4F46E5' },
+    orderPriority: { type: Number, default: 0 },
     limitations: {
-      maxTestsPerDay: Number,
-      maxDownloadsPerDay: Number,
-      solutionsAccess: {
-        type: Boolean,
-        default: false,
-      },
+      maxTestsPerDay:      Number,
+      maxDownloadsPerDay:  Number,
+      solutionsAccess: { type: Boolean, default: false },
     },
-    benefits: {
-      type: [String],
-      default: [],
-    },
-    compareWith: {
-      type: String,
-    },
-    metaTitle: String,
+    benefits:       { type: [String], default: [] },
+    compareWith:    { type: String },
+    metaTitle:       String,
     metaDescription: String,
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },
+    toJSON:   { virtuals: true },
     toObject: { virtuals: true },
   }
 );
 
-// Indexes
+// ── Indexes ───────────────────────────────────────────────────────────────────
 packageSchema.index({ name: 1 });
 packageSchema.index({ isActive: 1 });
 packageSchema.index({ isPopular: -1 });
 packageSchema.index({ orderPriority: 1 });
 packageSchema.index({ price: 1 });
 
-// Virtual for cost per credit
+// ── Virtuals ──────────────────────────────────────────────────────────────────
 packageSchema.virtual('costPerCredit').get(function () {
   return Math.round((this.discountedPrice || this.price) / this.credits);
 });
 
-// Virtual for validity in months
 packageSchema.virtual('validityMonths').get(function () {
   return Math.round(this.validityDays / 30);
 });
 
-// Virtual for discount percentage
 packageSchema.virtual('discountPercentage').get(function () {
   if (this.discountedPrice && this.price > this.discountedPrice) {
     return Math.round(((this.price - this.discountedPrice) / this.price) * 100);
@@ -155,7 +129,7 @@ packageSchema.virtual('discountPercentage').get(function () {
   return 0;
 });
 
-// Pre-save middleware to calculate savings
+// ── Pre-save: auto-calculate savings ─────────────────────────────────────────
 packageSchema.pre('save', function (next) {
   if (this.discountedPrice && this.price > this.discountedPrice) {
     this.savings = this.price - this.discountedPrice;
@@ -164,5 +138,4 @@ packageSchema.pre('save', function (next) {
 });
 
 const Package = mongoose.model<IPackageDocument>('Package', packageSchema);
-
 export default Package;

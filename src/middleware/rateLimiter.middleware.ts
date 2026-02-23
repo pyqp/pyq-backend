@@ -1,88 +1,70 @@
 import rateLimit from 'express-rate-limit';
-import RedisStore from 'rate-limit-redis';
-import redis from '../config/redis.config';
 
-const makeStore = () => {
+/**
+ * Each limiter must get its OWN RedisStore instance (different prefix).
+ * express-rate-limit throws ERR_ERL_STORE_REUSE if a store is shared.
+ * Falls back to in-memory store if rate-limit-redis / Redis is unavailable.
+ */
+const makeStore = (prefix: string) => {
   try {
-    return new RedisStore({
-      // @ts-expect-error — ioredis sendCommand vs node-redis signature differs
-      sendCommand: (...args: string[]) => redis.call(...args),
-    });
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const RedisStore = require('rate-limit-redis');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const redis = require('../config/redis').default;
+    return {
+      store: new RedisStore({
+        prefix,
+        sendCommand: (...args: string[]) => redis.call(...args),
+      }),
+    };
   } catch {
-    return undefined; // Fall back to memory store if Redis unavailable
+    // rate-limit-redis not installed or Redis not running → memory store
+    return {};
   }
 };
 
-const store = makeStore();
+const make = (prefix: string, windowMs: number, max: number, message: string) =>
+  rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders:   false,
+    message:         { success: false, message },
+    ...makeStore(prefix),          // fresh store per limiter
+  });
 
-/**
- * General API — 100 req / 15 min per IP
- */
-export const apiLimiter = rateLimit({
-  windowMs:        15 * 60 * 1000,
-  max:             100,
-  standardHeaders: true,
-  legacyHeaders:   false,
-  store,
-  message: { success: false, message: 'Too many requests. Please try again after 15 minutes.' },
-});
+/** General API — 100 req / 15 min */
+export const apiLimiter = make(
+  'rl:api:', 15 * 60 * 1000, 100,
+  'Too many requests. Please try again after 15 minutes.'
+);
 
-/**
- * Auth routes — 20 req / 15 min (prevent brute force)
- */
-export const authLimiter = rateLimit({
-  windowMs:        15 * 60 * 1000,
-  max:             20,
-  standardHeaders: true,
-  legacyHeaders:   false,
-  store,
-  message: { success: false, message: 'Too many login attempts. Please try again after 15 minutes.' },
-});
+/** Auth routes — 20 req / 15 min */
+export const authLimiter = make(
+  'rl:auth:', 15 * 60 * 1000, 20,
+  'Too many login attempts. Please try again after 15 minutes.'
+);
 
-/**
- * OTP / email resend — 5 req / 10 min
- */
-export const otpLimiter = rateLimit({
-  windowMs:        10 * 60 * 1000,
-  max:             5,
-  standardHeaders: true,
-  legacyHeaders:   false,
-  store,
-  message: { success: false, message: 'Too many OTP requests. Please wait 10 minutes.' },
-});
+/** OTP / email resend — 5 req / 10 min */
+export const otpLimiter = make(
+  'rl:otp:', 10 * 60 * 1000, 5,
+  'Too many OTP requests. Please wait 10 minutes.'
+);
 
-/**
- * Payment routes — 30 req / 15 min
- */
-export const paymentLimiter = rateLimit({
-  windowMs:        15 * 60 * 1000,
-  max:             30,
-  standardHeaders: true,
-  legacyHeaders:   false,
-  store,
-  message: { success: false, message: 'Too many payment requests. Please try again later.' },
-});
+/** Payment routes — 30 req / 15 min */
+export const paymentLimiter = make(
+  'rl:payment:', 15 * 60 * 1000, 30,
+  'Too many payment requests. Please try again later.'
+);
 
-/**
- * Test start — 10 req / 10 min (prevent credit farming)
- */
-export const testLimiter = rateLimit({
-  windowMs:        10 * 60 * 1000,
-  max:             10,
-  standardHeaders: true,
-  legacyHeaders:   false,
-  store,
-  message: { success: false, message: 'Too many test attempts. Please wait a few minutes.' },
-});
+/** Test start — 10 req / 10 min */
+export const testLimiter = make(
+  'rl:test:', 10 * 60 * 1000, 10,
+  'Too many test attempts. Please wait a few minutes.'
+);
 
-/**
- * Contact form — 5 req / 1 hour
- */
-export const contactLimiter = rateLimit({
-  windowMs:        60 * 60 * 1000,
-  max:             5,
-  standardHeaders: true,
-  legacyHeaders:   false,
-  store,
-  message: { success: false, message: 'Too many contact submissions. Please wait an hour.' },
-});
+/** Contact form — 5 req / 1 hour */
+export const contactLimiter = make(
+  'rl:contact:', 60 * 60 * 1000, 5,
+  'Too many contact submissions. Please wait an hour.'
+);

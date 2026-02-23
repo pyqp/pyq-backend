@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import userController from '../controllers/user.controller';
 import { protect } from '../middleware/auth.middleware';
+import { uploadAvatar } from '../middleware/upload.middleware';
 
 const router = Router();
 
@@ -20,6 +21,13 @@ router.get('/profile', userController.getProfile);
  * @access  Private
  */
 router.put('/profile', userController.updateProfile);
+
+/**
+ * @route   POST /api/v1/users/avatar
+ * @desc    Upload user avatar (multipart/form-data, field: avatar)
+ * @access  Private
+ */
+router.post('/avatar', uploadAvatar, userController.uploadAvatar);
 
 /**
  * @route   PUT /api/v1/users/preferences

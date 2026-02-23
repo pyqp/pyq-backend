@@ -5,6 +5,7 @@ import ApiError from '../utils/ApiError';
 import ApiResponse from '../utils/ApiResponse';
 import asyncHandler from '../utils/asyncHandler';
 import { AuthRequest } from '../types';
+import { UploadService } from '../services/upload.service';
 
 /**
  * @desc    Get user profile
@@ -127,6 +128,13 @@ export const getDashboard = asyncHandler(async (req: AuthRequest, res: Response)
     batch => new Date(batch.expiryDate) <= sevenDaysFromNow
   );
 
+  // Recent results (last 5)
+  const recentResults = await Result.find({ user: user._id })
+    .populate('mockTest', 'name slug difficulty')
+    .sort('-createdAt')
+    .limit(5)
+    .select('mockTest finalScore totalMarks percentage correct incorrect unattempted accuracy timeTaken attemptNumber createdAt');
+
   ApiResponse.success(
     res,
     {
@@ -160,6 +168,7 @@ export const getDashboard = asyncHandler(async (req: AuthRequest, res: Response)
         bonusCreditsEarned: user.referralStats.bonusCreditsEarned,
       },
       stats: user.stats,
+      recentResults,
     },
     'Dashboard data fetched successfully'
   );
@@ -225,9 +234,31 @@ export const deleteAccount = asyncHandler(async (req: AuthRequest, res: Response
   ApiResponse.success(res, null, 'Account deleted successfully');
 });
 
+/**
+ * @desc    Upload user avatar to Cloudinary
+ * @route   POST /api/v1/users/avatar
+ * @access  Private
+ */
+export const uploadAvatar = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.file) {
+    throw new ApiError('No image file provided', 400);
+  }
+
+  const userId = req.user!._id.toString();
+
+  // Upload buffer to Cloudinary
+  const avatarUrl = await UploadService.uploadAvatar(userId, req.file.buffer);
+
+  // Persist URL on user document
+  await User.findByIdAndUpdate(userId, { avatar: avatarUrl });
+
+  ApiResponse.success(res, { avatarUrl }, 'Avatar uploaded successfully');
+});
+
 export default {
   getProfile,
   updateProfile,
+  uploadAvatar,
   updatePreferences,
   getDashboard,
   getTestHistory,

@@ -94,61 +94,55 @@ export const getDashboard = asyncHandler(async (_req: AuthRequest, res: Response
 // ─── Revenue Analytics ────────────────────────────────────────────────────────
 
 /**
- * @desc    Revenue chart — daily/monthly
+ * @desc    Revenue chart — monthly
  * @route   GET /api/v1/admin/analytics/revenue?period=monthly&months=6
  * @access  Private/Admin
  */
 export const getRevenueAnalytics = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const period = (req.query.period as string) || 'monthly';
   const months = parseInt((req.query.months as string) || '6', 10);
 
   const since = new Date();
   since.setMonth(since.getMonth() - months);
 
-  let groupBy: any;
-  if (period === 'daily') {
-    groupBy = {
-      year:  { $year: '$createdAt' },
-      month: { $month: '$createdAt' },
-      day:   { $dayOfMonth: '$createdAt' },
-    };
-  } else {
-    groupBy = {
-      year:  { $year: '$createdAt' },
-      month: { $month: '$createdAt' },
-    };
-  }
-
   const revenue = await Payment.aggregate([
     { $match: { status: 'success', createdAt: { $gte: since } } },
     { $group: {
-      _id:          groupBy,
-      total:        { $sum: '$amount' },
+      _id: {
+        year:  { $year: '$createdAt' },
+        month: { $month: '$createdAt' },
+      },
+      revenue: { $sum: '$amount' },
+      total:   { $sum: '$amount' },
       transactions: { $sum: 1 },
-      avgOrder:     { $avg: '$amount' },
     }},
-    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } },
+    { $sort: { '_id.year': 1, '_id.month': 1 } },
+    { $project: {
+      _id: 0,
+      month: {
+        $let: {
+          vars: {
+            monthsInYear: ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+          },
+          in: { $arrayElemAt: ['$$monthsInYear', '$_id.month'] }
+        }
+      },
+      period: {
+        $concat: [
+          { $toString: '$_id.year' },
+          '-',
+          { $cond: {
+            if: { $lt: ['$_id.month', 10] },
+            then: { $concat: ['0', { $toString: '$_id.month' }] },
+            else: { $toString: '$_id.month' }
+          }}
+        ]
+      },
+      revenue: 1,
+      total: 1,
+    }},
   ]);
 
-  const packageBreakdown = await Payment.aggregate([
-    { $match: { status: 'success', createdAt: { $gte: since } } },
-    { $lookup: { from: 'packages', localField: 'package', foreignField: '_id', as: 'pkg' } },
-    { $unwind: '$pkg' },
-    { $group: {
-      _id:          '$pkg.name',
-      revenue:      { $sum: '$amount' },
-      count:        { $sum: 1 },
-      avgAmount:    { $avg: '$amount' },
-    }},
-    { $sort: { revenue: -1 } },
-  ]);
-
-  ApiResponse.success(res, {
-    period,
-    months,
-    revenue,
-    packageBreakdown,
-  }, 'Revenue analytics fetched successfully');
+  ApiResponse.success(res, revenue, 'Revenue analytics fetched successfully');
 });
 
 /**
@@ -164,38 +158,38 @@ export const getUserAnalytics = asyncHandler(async (req: AuthRequest, res: Respo
   const signups = await User.aggregate([
     { $match: { createdAt: { $gte: since }, role: 'user' } },
     { $group: {
-      _id:   { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+      _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+      newUsers: { $sum: 1 },
       count: { $sum: 1 },
     }},
     { $sort: { '_id.year': 1, '_id.month': 1 } },
-  ]);
-
-  const convertedUsers = await Payment.aggregate([
-    { $match: { status: 'success', createdAt: { $gte: since } } },
-    { $group: {
-      _id:   { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
-      count: { $sum: 1 },
+    { $project: {
+      _id: 0,
+      month: {
+        $let: {
+          vars: {
+            monthsInYear: ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+          },
+          in: { $arrayElemAt: ['$$monthsInYear', '$_id.month'] }
+        }
+      },
+      period: {
+        $concat: [
+          { $toString: '$_id.year' },
+          '-',
+          { $cond: {
+            if: { $lt: ['$_id.month', 10] },
+            then: { $concat: ['0', { $toString: '$_id.month' }] },
+            else: { $toString: '$_id.month' }
+          }}
+        ]
+      },
+      newUsers: 1,
+      count: 1,
     }},
-    { $sort: { '_id.year': 1, '_id.month': 1 } },
   ]);
 
-  const [verified, unverified, byExamPreference] = await Promise.all([
-    User.countDocuments({ isEmailVerified: true, role: 'user' }),
-    User.countDocuments({ isEmailVerified: false, role: 'user' }),
-    User.aggregate([
-      { $unwind: '$preferences.targetExams' },
-      { $group: { _id: '$preferences.targetExams', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 },
-    ]),
-  ]);
-
-  ApiResponse.success(res, {
-    signups,
-    conversions: convertedUsers,
-    verification: { verified, unverified },
-    topExamPreferences: byExamPreference,
-  }, 'User analytics fetched successfully');
+  ApiResponse.success(res, signups, 'User analytics fetched successfully');
 });
 
 /**
@@ -268,7 +262,7 @@ export const getTestAnalytics = asyncHandler(async (_req: AuthRequest, res: Resp
  * @access  Private/Admin
  */
 export const listUsers = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { search, role, isActive, page = '1', limit = '20', sort = '-createdAt' } = req.query;
+  const { search, role, isActive, page = '1', limit = '15', sort = '-createdAt' } = req.query;
   const pageNum  = parseInt(page as string, 10);
   const limitNum = parseInt(limit as string, 10);
   const skip     = (pageNum - 1) * limitNum;
@@ -363,8 +357,21 @@ export const grantCredits = asyncHandler(async (req: AuthRequest, res: Response)
   if (!user) throw new ApiError('User not found', 404);
 
   const creditsBefore = user.credits.total;
-  await user.addCredits(credits, validityDays, 'Admin Grant');
+  
+  // Add credits to user
+  user.credits.total += credits;
+  
+  // Add to credit batches
+  user.credits.batches.push({
+    packageName: `Admin Grant: ${reason}`,
+    creditsInitial: credits,
+    creditsRemaining: credits,
+    expiresAt: new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000),
+  } as any);
+  
+  await user.save();
 
+  // Create credit transaction record
   await CreditTransaction.create({
     user:          user._id,
     type:          'credit',
@@ -511,8 +518,10 @@ export const getQuestionStats = asyncHandler(async (_req: AuthRequest, res: Resp
     { $lookup: { from: 'exams', localField: '_id', foreignField: '_id', as: 'exam' } },
     { $unwind: '$exam' },
     { $project: {
+      _id: 0,
+      examId: '$_id',
       examName:  '$exam.name',
-      shortName: '$exam.shortName',
+      examShortName: '$exam.shortName',
       category:  '$exam.category',
       total: 1, pyq: 1, mock: 1, practice: 1, easy: 1, medium: 1, hard: 1,
     }},

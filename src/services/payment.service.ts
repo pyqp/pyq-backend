@@ -1,7 +1,6 @@
 import razorpay from '../config/razorpay.config';
 import { createHmac } from 'crypto';
 import Payment from '../models/Payment.model';
-import Refund from '../models/Refund.model';
 import logger from '../utils/logger';
 
 export class PaymentService {
@@ -19,27 +18,33 @@ export class PaymentService {
     return expected === signature;
   }
 
-  static async createRazorpayOrder(amount: number, receipt: string, notes: Record<string, string>): Promise<any> {
-    return (razorpay.orders.create as any)({
-      amount:   amount * 100,
+  static async createRazorpayOrder(
+    amount: number,
+    receipt: string,
+    notes: Record<string, string>
+  ): Promise<any> {
+    return razorpay.orders.create({
+      amount:   amount * 100,  // paise
       currency: 'INR',
       receipt,
       notes,
-    });
+    } as any);
   }
 
-  static async initiateRefund(paymentId: string, amount: number, notes?: Record<string, string>): Promise<any> {
-    try {
-      const payment = await Payment.findById(paymentId);
-      if (!payment || !payment.paymentId) throw new Error('Payment not found or not completed');
-      if (payment.status !== 'success') throw new Error('Only successful payments can be refunded');
+  static async initiateRefund(
+    paymentId: string,
+    amount: number,
+    notes?: Record<string, string>
+  ): Promise<any> {
+    const payment = await Payment.findById(paymentId);
+    if (!payment || !payment.paymentId) throw new Error('Payment not found or not completed');
+    if (payment.status !== 'success')   throw new Error('Only successful payments can be refunded');
 
-      const refund = await (razorpay.payments.refund as any)(payment.paymentId, {
+    try {
+      return await (razorpay.payments as any).refund(payment.paymentId, {
         amount: amount * 100,
         notes,
       });
-
-      return refund;
     } catch (err: any) {
       logger.error(`Refund initiation failed: ${err.message}`);
       throw err;

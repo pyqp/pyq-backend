@@ -1,59 +1,66 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// ── NOTE: your local file uses 'database.config', not 'database' ─────────────
+// If yours is config/database.ts change the import below to match.
 import connectDB from '../../config/database.config';
 import Package from '../../models/Package.model';
 import logger from '../../utils/logger';
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Business rules (source of truth — confirmed by owner)
+//  ₹199  →  10 credits  ·  30 days   (1 month)
+//  ₹499  →  50 credits  · 365 days   (1 year)
+//  ₹799  → 100 credits  · 548 days   (1.5 years / 18 months)
+// ─────────────────────────────────────────────────────────────────────────────
+
 const packagesData = [
   {
-    name: 'BASIC',
-    displayName: 'Basic',
-    price: 199,
-    discountedPrice: 149,
-    credits: 1,
-    validityDays: 365,
-    description: 'Perfect for trying out a single mock test with full analytics.',
-    isPopular: false,
-    isActive: true,
-    badge: '',
-    color: '#6B7280',
-    orderPriority: 1,
-    limitations: { solutionsAccess: false },
+    name:           'STARTER',
+    displayName:    'Starter',
+    price:          199,
+    credits:        10,
+    validityDays:   30,
+    description:    'Try it out — 10 credits to attempt any 10 mock tests, valid for 1 month.',
+    isPopular:      false,
+    isActive:       true,
+    badge:          '',
+    color:          '#0ea5e9',
+    orderPriority:  1,
+    limitations:    { solutionsAccess: false },
     features: [
-      '1 Mock Test Credit',
-      'Valid for 365 days',
+      '10 Mock Test Credits',
+      'Valid for 1 Month',
       'All India Rankings',
       'Basic Performance Analytics',
       'Subject-wise Score Breakdown',
       'Email Support',
     ],
     benefits: [
-      'Try our platform risk-free',
+      '₹19.90 per test',
+      'Try before committing to a bigger plan',
       'Full mock test experience',
-      'Compare with toppers',
     ],
-    compareWith: 'Best for first-timers',
-    metaTitle: 'PYQPB Basic Package – ₹149 for 1 Mock Test',
-    metaDescription: 'Start your exam preparation with 1 mock test credit valid for 1 year.',
+    compareWith:     'Best for first-timers',
+    metaTitle:       'PYQPB Starter – ₹199 for 10 Credits',
+    metaDescription: '10 mock test credits valid for 1 month.',
   },
   {
-    name: 'BEST_VALUE',
-    displayName: 'Best Value',
-    price: 499,
-    discountedPrice: 399,
-    credits: 5,
-    validityDays: 365,
-    description: 'Most popular choice — 5 tests with complete solutions at the best per-test price.',
-    isPopular: true,
-    isActive: true,
-    badge: 'BEST VALUE',
-    color: '#10B981',
-    orderPriority: 2,
-    limitations: { solutionsAccess: true },
+    name:           'VALUE',
+    displayName:    'Value',
+    price:          499,
+    credits:        50,
+    validityDays:   365,
+    description:    'Best for serious aspirants — 50 credits over a full year at the best per-test price.',
+    isPopular:      true,
+    isActive:       true,
+    badge:          'MOST POPULAR',
+    color:          '#f59e0b',
+    orderPriority:  2,
+    limitations:    { solutionsAccess: true },
     features: [
-      '5 Mock Test Credits',
-      'Valid for 365 days',
+      '50 Mock Test Credits',
+      'Valid for 1 Year',
       'All India Rankings',
       'Detailed Performance Analytics',
       'Complete Text Solutions Included',
@@ -62,32 +69,30 @@ const packagesData = [
       'Priority Email Support',
     ],
     benefits: [
-      'Only ₹80 per test',
-      'Save ₹100 vs 5× Basic',
+      '₹9.98 per test — 50% cheaper than Starter',
+      'Prepare comfortably across an entire year',
       'Full solutions for every question',
-      'Track improvement over 5 attempts',
     ],
-    compareWith: 'Save ₹100 compared to buying 5 Basic packs',
-    metaTitle: 'PYQPB Best Value Package – ₹399 for 5 Mock Tests',
-    metaDescription: 'Get 5 mock test credits with complete solutions valid for 1 year at just ₹80/test.',
+    compareWith:     'Save ₹501 compared to 50× Starter credits',
+    metaTitle:       'PYQPB Value – ₹499 for 50 Credits',
+    metaDescription: '50 mock test credits valid for 1 year at just ₹9.98/test.',
   },
   {
-    name: 'PREMIUM',
-    displayName: 'Premium',
-    price: 799,
-    discountedPrice: 649,
-    credits: 10,
-    validityDays: 365,
-    description: 'Ultimate preparation package — 10 tests, detailed analytics, and 24/7 support.',
-    isPopular: false,
-    isActive: true,
-    badge: 'MOST POPULAR',
-    color: '#8B5CF6',
-    orderPriority: 3,
-    limitations: { solutionsAccess: true },
+    name:           'PRO',
+    displayName:    'Pro',
+    price:          799,
+    credits:        100,
+    validityDays:   548,
+    description:    'For the dedicated topper — 100 credits over 18 months with full analytics and priority support.',
+    isPopular:      false,
+    isActive:       true,
+    badge:          'BEST DEAL',
+    color:          '#a855f7',
+    orderPriority:  3,
+    limitations:    { solutionsAccess: true },
     features: [
-      '10 Mock Test Credits',
-      'Valid for 365 days',
+      '100 Mock Test Credits',
+      'Valid for 18 Months',
       'All India Rankings',
       'Advanced Analytics Dashboard',
       'Complete Text Solutions Included',
@@ -96,19 +101,17 @@ const packagesData = [
       'Topic-wise Performance Tracking',
       'Difficulty-wise Analysis',
       'Downloadable PDF Score Card',
-      'Priority Support (24/7)',
+      '24/7 Priority Support',
       'Personalized Weak Area Focus',
     ],
     benefits: [
-      'Only ₹65 per test — lowest price',
-      'Save ₹300 vs 10× Basic',
+      '₹7.99 per test — lowest price on platform',
+      '18 months to prepare at your own pace',
       'Most comprehensive analytics',
-      'Full test history tracking',
-      '24/7 dedicated support',
     ],
-    compareWith: 'Save ₹300 compared to buying 10 Basic packs',
-    metaTitle: 'PYQPB Premium Package – ₹649 for 10 Mock Tests',
-    metaDescription: 'Best value with 10 credits, advanced analytics and 24/7 support valid for 1 year.',
+    compareWith:     'Save ₹1201 compared to 100× Starter credits',
+    metaTitle:       'PYQPB Pro – ₹799 for 100 Credits',
+    metaDescription: '100 mock test credits valid for 18 months with advanced analytics.',
   },
 ];
 
@@ -116,14 +119,11 @@ const seedPackages = async () => {
   try {
     await connectDB();
 
-    const existingCount = await Package.countDocuments();
-    if (existingCount > 0) {
-      logger.info(`Skipping — ${existingCount} packages already exist.`);
-      process.exit(0);
-    }
-
+    // Wipe stale data and re-seed cleanly
+    await Package.deleteMany({});
     const created = await Package.insertMany(packagesData);
-    logger.info(`✅ ${created.length} packages seeded successfully!`);
+    logger.info(`✅ ${created.length} packages seeded: STARTER / VALUE / PRO`);
+    logger.info('Prices: ₹199 (10cr/30d) | ₹499 (50cr/365d) | ₹799 (100cr/548d)');
     process.exit(0);
   } catch (error: any) {
     logger.error(`Error seeding packages: ${error.message}`);

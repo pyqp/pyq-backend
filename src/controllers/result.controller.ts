@@ -2,6 +2,7 @@ import { Response } from 'express';
 import Result from '../models/Result.model';
 import TestAttempt from '../models/TestAttempt.model';
 import MockTest from '../models/MockTest.model';
+import Question from '../models/Question.model';
 import ApiError from '../utils/ApiError';
 import ApiResponse from '../utils/ApiResponse';
 import asyncHandler from '../utils/asyncHandler';
@@ -98,8 +99,44 @@ export const getAnalytics = asyncHandler(async (req: AuthRequest, res: Response)
     weaknesses: result.weaknesses,
   };
 
-  // ── Section 6: Question-wise Analysis ───────────────────────────────────
-  const questionAnalysis = result.questionAnalysis;
+  // ── Section 6: Question-wise Analysis (enriched with Q text + options) ──
+  const rawQA = result.questionAnalysis as any[];
+
+  // Fetch question details for every question referenced in the analysis
+  const questionIds = rawQA
+    .map((qa: any) => qa.questionId ?? qa._id)
+    .filter(Boolean);
+
+  // Also get questions from the mockTest's question list (by questionNumber order)
+  const mockTestDoc = await MockTest.findById(result.mockTest).select('questions');
+  const orderedIds  = mockTestDoc?.questions ?? [];
+
+  const qDocs = await Question.find({
+    _id: { $in: [...questionIds, ...orderedIds] },
+  }).select('questionText options solution explanation marks negativeMarks');
+
+  // Build a lookup: _id string → question doc
+  const qMap = new Map(qDocs.map(q => [q._id.toString(), q]));
+
+  // Enrich each entry in questionAnalysis
+  const questionAnalysis = rawQA.map((qa: any, idx: number) => {
+    // Match by stored questionId or fall back to position in ordered list
+    const qId = qa.questionId?.toString()
+      ?? qa._id?.toString()
+      ?? (orderedIds[idx] ? orderedIds[idx].toString() : null);
+
+    const qDoc = qId ? qMap.get(qId) : undefined;
+
+    return {
+      ...qa,
+      questionText:  qDoc?.questionText  ?? null,
+      options:       qDoc?.options       ?? [],
+      solution:      qDoc?.solution      ?? null,
+      explanation:   qDoc?.explanation   ?? null,
+      marks:         qDoc?.marks         ?? qa.marks,
+      negativeMarks: qDoc?.negativeMarks ?? qa.negativeMarks,
+    };
+  });
 
   // ── Section 7: Progress (compare with past attempts on same test) ────────
   const pastResults = await Result.find({

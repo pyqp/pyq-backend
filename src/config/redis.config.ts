@@ -1,79 +1,79 @@
 import Redis from 'ioredis';
 import logger from '../utils/logger';
 
-const redis = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD || undefined,
-  retryStrategy: (times: number) => {
-    const delay = Math.min(times * 50, 2000);
-    return delay;
-  },
-  maxRetriesPerRequest: 3,
-});
+let redisAvailable = false;
 
-redis.on('connect', () => {
-  logger.info('Redis connected successfully');
-});
+// ── nullRedis: safe no-op fallback when Redis is not running ──────────────────
+// FIX: added setex (and all other methods) that were missing and caused
+//      "redis_config_1.default.setex is not a function" on GET /packages
+const nullRedis = {
+  get:     async () => null as string | null,
+  set:     async () => 'OK' as const,
+  setex:   async () => 'OK' as const,   // ← THE FIX
+  del:     async () => 0,
+  keys:    async () => [] as string[],
+  call:    async () => null,
+  on:      () => nullRedis,
+  expire:  async () => 0,
+  exists:  async () => 0,
+  incr:    async () => 0,
+  decr:    async () => 0,
+  hget:    async () => null,
+  hset:    async () => 0,
+  hdel:    async () => 0,
+  hgetall: async () => null,
+  llen:    async () => 0,
+  rpush:   async () => 0,
+  lpop:    async () => null,
+  publish: async () => 0,
+  quit:    async () => 'OK' as const,
+} as unknown as Redis;
 
-redis.on('error', (error: Error) => {
-  logger.error(`Redis connection error: ${error.message}`);
-});
+let redis: Redis = nullRedis;
 
-redis.on('close', () => {
-  logger.warn('Redis connection closed');
-});
+const REDIS_URL  = process.env.REDIS_URL;
+const REDIS_HOST = process.env.REDIS_HOST;
 
-// Helper functions
-export const cacheMiddleware = (duration: number) => {
-  return async (req: any, res: any, next: any) => {
-    if (req.method !== 'GET') {
-      return next();
-    }
+if (REDIS_URL || REDIS_HOST || process.env.NODE_ENV === 'production') {
+  let client: Redis;
 
-    const key = `cache:${req.originalUrl}`;
-
-    try {
-      const cached = await redis.get(key);
-
-      if (cached) {
-        logger.info(`Cache HIT: ${key}`);
-        return res.json(JSON.parse(cached));
-      }
-
-      logger.info(`Cache MISS: ${key}`);
-
-      // Store original res.json
-      const originalJson = res.json.bind(res);
-
-      res.json = (data: any) => {
-        // Cache the response
-        redis.setex(key, duration, JSON.stringify(data));
-        return originalJson(data);
-      };
-
-      next();
-    } catch (error: any) {
-      logger.error(`Cache error: ${error.message}`);
-      next(); // Continue without cache if Redis fails
-    }
-  };
-};
-
-// Clear cache by pattern
-export const clearCache = async (pattern: string): Promise<number> => {
-  try {
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) {
-      await redis.del(...keys);
-      logger.info(`Cleared ${keys.length} cache keys matching: ${pattern}`);
-      return keys.length;
-    }
-    return 0;
-  } catch (error: any) {
-    logger.error(`Error clearing cache: ${error.message}`);
-    return 0;
+  if (REDIS_URL) {
+    client = new Redis(REDIS_URL, {
+      retryStrategy:       (times) => (times > 3 ? null : Math.min(times * 200, 3000)),
+      maxRetriesPerRequest: 3,
+      enableOfflineQueue:   false,
+      lazyConnect:          true,
+    });
+  } else {
+    client = new Redis({
+      host:     REDIS_HOST || 'localhost',
+      port:     parseInt(process.env.REDIS_PORT || '6379'),
+      password: process.env.REDIS_PASSWORD || undefined,
+      retryStrategy: (times) => {
+        if (process.env.NODE_ENV !== 'production' && times > 3) {
+          logger.warn('Redis unavailable — stopping retries');
+          return null;
+        }
+        return Math.min(times * 200, 3000);
+      },
+      maxRetriesPerRequest: 3,
+      enableOfflineQueue:   false,
+      lazyConnect:          true,
+    });
   }
-};
 
+  client.on('connect', () => { redisAvailable = true;  logger.info('Redis connected'); });
+  client.on('close',   () => { redisAvailable = false; logger.warn('Redis connection closed'); });
+  client.on('error',   (e: Error) => logger.error(`Redis error: ${e.message}`));
+
+  client.connect().catch(() => {
+    logger.warn('Redis not available — caching disabled');
+  });
+
+  redis = client;
+} else {
+  logger.info('Redis not configured — caching skipped (add REDIS_HOST to .env to enable)');
+}
+
+export { redisAvailable };
 export default redis;
