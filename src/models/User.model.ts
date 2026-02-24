@@ -413,10 +413,41 @@ userSchema.methods.addCredits = async function (
   await this.save();
 };
 
-// Method: Deduct credits (FIFO)
+// Method: Check if user has valid credits
+userSchema.methods.hasValidCredits = function (required: number): boolean {
+  // ADMINS ALWAYS HAVE UNLIMITED CREDITS
+  if (this.role === 'admin') {
+    return true;
+  }
+  
+  if (this.credits.total < required) {
+    return false;
+  }
+  
+  const now = new Date();
+  const validCredits = this.credits.batches
+    .filter((batch: any) => {
+      return (
+        batch.status === 'active' &&
+        batch.creditsRemaining > 0 &&
+        new Date(batch.expiryDate) > now
+      );
+    })
+    .reduce((sum: number, batch: any) => sum + batch.creditsRemaining, 0);
+  
+  return validCredits >= required;
+};
+
+// ALSO UPDATE deductCredits to skip deduction for admins:
+
 userSchema.methods.deductCredits = async function (
   required: number
 ): Promise<boolean> {
+  // ADMINS DON'T NEED TO DEDUCT CREDITS
+  if (this.role === 'admin') {
+    return true;
+  }
+  
   if (!this.hasValidCredits(required)) {
     return false;
   }
@@ -446,26 +477,6 @@ userSchema.methods.deductCredits = async function (
   
   await this.save();
   return true;
-};
-
-// Method: Check if user has valid credits
-userSchema.methods.hasValidCredits = function (required: number): boolean {
-  if (this.credits.total < required) {
-    return false;
-  }
-  
-  const now = new Date();
-  const validCredits = this.credits.batches
-    .filter((batch: any) => {
-      return (
-        batch.status === 'active' &&
-        batch.creditsRemaining > 0 &&
-        new Date(batch.expiryDate) > now
-      );
-    })
-    .reduce((sum: number, batch: any) => sum + batch.creditsRemaining, 0);
-  
-  return validCredits >= required;
 };
 
 const User = mongoose.model<IUserDocument>('User', userSchema);

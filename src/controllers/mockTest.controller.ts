@@ -28,9 +28,9 @@ const computeResult = async (attempt: any, mockTest: any) => {
   // Subject tracking
   const subjectMap: Record<string, any> = {};
   const difficultyMap: Record<string, any> = {
-    easy:   { total: 0, attempted: 0, correct: 0 },
+    easy: { total: 0, attempted: 0, correct: 0 },
     medium: { total: 0, attempted: 0, correct: 0 },
-    hard:   { total: 0, attempted: 0, correct: 0 },
+    hard: { total: 0, attempted: 0, correct: 0 },
   };
 
   const questionAnalysis: any[] = [];
@@ -40,8 +40,8 @@ const computeResult = async (attempt: any, mockTest: any) => {
     if (!q) continue;
 
     const subject = q.subject;
-    const topic   = q.topic;
-    const diff    = q.difficulty;
+    const topic = q.topic;
+    const diff = q.difficulty;
 
     // Init subject
     if (!subjectMap[subject]) {
@@ -103,28 +103,26 @@ const computeResult = async (attempt: any, mockTest: any) => {
 
   // Compute subject performance array
   const subjectPerformance = Object.values(subjectMap).map((s: any) => {
-    const acc = s.totalQuestions > 0
-      ? Math.round(((s.correct) / (s.correct + s.incorrect || 1)) * 100)
-      : 0;
-    const pct = mockTest.totalMarks > 0
-      ? Math.round((s.score / mockTest.totalMarks) * 100)
-      : 0;
-    const avgTime = (s.correct + s.incorrect) > 0
-      ? Math.round(s.timeSpent / (s.correct + s.incorrect))
-      : 0;
-    const status =
-      acc >= 80 ? 'excellent' :
-      acc >= 60 ? 'good' :
-      acc >= 40 ? 'average' : 'weak';
+    const acc =
+      s.totalQuestions > 0 ? Math.round((s.correct / (s.correct + s.incorrect || 1)) * 100) : 0;
+    const pct = mockTest.totalMarks > 0 ? Math.round((s.score / mockTest.totalMarks) * 100) : 0;
+    const avgTime =
+      s.correct + s.incorrect > 0 ? Math.round(s.timeSpent / (s.correct + s.incorrect)) : 0;
+    const status = acc >= 80 ? 'excellent' : acc >= 60 ? 'good' : acc >= 40 ? 'average' : 'weak';
 
     const topics = Object.values(s.topics).map((t: any) => ({
       topic: t.topic,
       total: t.total,
       correct: t.correct,
       percentage: t.total > 0 ? Math.round((t.correct / t.total) * 100) : 0,
-      status: t.total > 0 && (t.correct / t.total) >= 0.8 ? 'excellent' :
-              t.total > 0 && (t.correct / t.total) >= 0.6 ? 'good' :
-              t.total > 0 && (t.correct / t.total) >= 0.4 ? 'average' : 'weak',
+      status:
+        t.total > 0 && t.correct / t.total >= 0.8
+          ? 'excellent'
+          : t.total > 0 && t.correct / t.total >= 0.6
+            ? 'good'
+            : t.total > 0 && t.correct / t.total >= 0.4
+              ? 'average'
+              : 'weak',
     }));
 
     return {
@@ -146,9 +144,7 @@ const computeResult = async (attempt: any, mockTest: any) => {
   // Difficulty accuracy
   ['easy', 'medium', 'hard'].forEach(d => {
     const entry = difficultyMap[d];
-    entry.accuracy = entry.attempted > 0
-      ? Math.round((entry.correct / entry.attempted) * 100)
-      : 0;
+    entry.accuracy = entry.attempted > 0 ? Math.round((entry.correct / entry.attempted) * 100) : 0;
   });
 
   // Strengths & weaknesses
@@ -163,20 +159,23 @@ const computeResult = async (attempt: any, mockTest: any) => {
         currentAccuracy: s.accuracy,
         priority: s.accuracy < 40 ? 'high' : 'medium',
         recommendation: `Focus on ${s.subject} — practice more ${
-          s.topics.filter((t: any) => t.status === 'weak').map((t: any) => t.topic).join(', ') || 'topics'
+          s.topics
+            .filter((t: any) => t.status === 'weak')
+            .map((t: any) => t.topic)
+            .join(', ') || 'topics'
         }`,
       });
     }
   });
 
-  const timeTaken     = attempt.timeTaken || Math.ceil(totalTimeSpent / 60);
-  const percentage    = Math.round((Math.max(0, finalScore) / mockTest.totalMarks) * 100);
-  const accuracy      = (correct + incorrect) > 0
-    ? Math.round((correct / (correct + incorrect)) * 100) : 0;
-  const timeEfficiency = mockTest.duration > 0
-    ? Math.round((timeTaken / mockTest.duration) * 100) : 0;
-  const avgTimePerQ   = (correct + incorrect) > 0
-    ? Math.round((timeTaken * 60) / (correct + incorrect)) : 0;
+  const timeTaken = attempt.timeTaken || Math.ceil(totalTimeSpent / 60);
+  const percentage = Math.round((Math.max(0, finalScore) / mockTest.totalMarks) * 100);
+  const accuracy =
+    correct + incorrect > 0 ? Math.round((correct / (correct + incorrect)) * 100) : 0;
+  const timeEfficiency =
+    mockTest.duration > 0 ? Math.round((timeTaken / mockTest.duration) * 100) : 0;
+  const avgTimePerQ =
+    correct + incorrect > 0 ? Math.round((timeTaken * 60) / (correct + incorrect)) : 0;
 
   return {
     finalScore: Math.max(0, finalScore),
@@ -204,16 +203,14 @@ const computeRank = async (mockTestId: string, score: number, timeTaken: number)
   // Count users who scored strictly higher, or same score in less time
   const betterCount = await Ranking.countDocuments({
     mockTest: mockTestId,
-    $or: [
-      { score: { $gt: score } },
-      { score, timeTaken: { $lt: timeTaken } },
-    ],
+    $or: [{ score: { $gt: score } }, { score, timeTaken: { $lt: timeTaken } }],
   });
   const totalParticipants = await Ranking.countDocuments({ mockTest: mockTestId });
-  const rank      = betterCount + 1;
-  const percentile = totalParticipants > 0
-    ? Math.round(((totalParticipants - betterCount) / totalParticipants) * 100)
-    : 100;
+  const rank = betterCount + 1;
+  const percentile =
+    totalParticipants > 0
+      ? Math.round(((totalParticipants - betterCount) / totalParticipants) * 100)
+      : 100;
   return { rank, percentile, totalParticipants: totalParticipants + 1 };
 };
 
@@ -228,13 +225,13 @@ export const getAllMockTests = asyncHandler(async (req: AuthRequest, res: Respon
   const { examId, difficulty, isPaid, page = '1', limit = '10' } = req.query;
 
   const query: any = { isActive: true };
-  if (examId)     query.exam       = examId;
+  if (examId) query.exam = examId;
   if (difficulty) query.difficulty = difficulty;
   if (isPaid !== undefined) query.isPaid = isPaid === 'true';
 
-  const pageNum  = parseInt(page as string, 10);
+  const pageNum = parseInt(page as string, 10);
   const limitNum = parseInt(limit as string, 10);
-  const skip     = (pageNum - 1) * limitNum;
+  const skip = (pageNum - 1) * limitNum;
 
   const tests = await MockTest.find(query)
     .populate('exam', 'name shortName category')
@@ -268,11 +265,13 @@ export const getMockTestById = asyncHandler(async (req: AuthRequest, res: Respon
  * @route   POST /api/v1/mock-tests/:id/start
  * @access  Private
  */
+// REPLACE YOUR startMockTest FUNCTION WITH THIS:
+
 export const startMockTest = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId     = req.user!._id;
+  const userId = req.user!._id;
   const mockTestId = req.params.id;
 
-  const test = await MockTest.findById(mockTestId).populate('questions');
+  const test = await MockTest.findById(mockTestId);
   if (!test || !test.isActive) throw new ApiError('Mock test not found', 404);
 
   // Check for existing ongoing attempt
@@ -281,11 +280,42 @@ export const startMockTest = asyncHandler(async (req: AuthRequest, res: Response
     mockTest: mockTestId,
     status: 'ongoing',
   });
+
   if (ongoing) {
     // Resume: return existing attempt with questions
     const questions = await Question.find({ _id: { $in: test.questions } })
       .select('questionText questionImage options difficulty subject topic marks negativeMarks timeEstimate');
-    return ApiResponse.success(res, { attempt: ongoing, questions, isResumed: true }, 'Test resumed');
+
+    const questionsForClient = questions.map(q => ({
+      _id: q._id,
+      questionText: q.questionText,
+      questionImage: q.questionImage,
+      options: q.options,
+      difficulty: q.difficulty,
+      subject: q.subject,
+      topic: q.topic,
+      marks: q.marks,
+      negativeMarks: q.negativeMarks,
+      timeEstimate: q.timeEstimate,
+    }));
+
+    return ApiResponse.success(
+      res,
+      {
+        attempt: {
+          _id: ongoing._id,
+          attemptNumber: ongoing.attemptNumber,
+          startTime: ongoing.startTime,
+          duration: test.duration,
+          totalQuestions: test.totalQuestions,
+          totalMarks: test.totalMarks,
+        },
+        questions: questionsForClient,
+        instructions: test.instructions,
+        isResumed: true,
+      },
+      'Test resumed'
+    );
   }
 
   // Deduct credit if test is paid
@@ -304,23 +334,23 @@ export const startMockTest = asyncHandler(async (req: AuthRequest, res: Response
 
   // Build blank response array
   const questions = await Question.find({ _id: { $in: test.questions } })
-    .select('questionText questionImage options difficulty subject topic marks negativeMarks timeEstimate');
+    .select('questionText questionImage options correctOption difficulty subject topic marks negativeMarks timeEstimate');
 
   const responses = questions.map((q, i) => ({
     questionNumber: i + 1,
-    question:       q._id,
-    correctAnswer:  q.correctOption ?? 0,
-    timeSpent:      0,
+    question: q._id,
+    correctAnswer: q.correctOption ?? 0,
+    timeSpent: 0,
     markedForReview: false,
-    marks:          0,
+    marks: 0,
   }));
 
   const attempt = await TestAttempt.create({
-    user:          userId,
-    mockTest:      mockTestId,
+    user: userId,
+    mockTest: mockTestId,
     attemptNumber: priorAttempts + 1,
-    startTime:     new Date(),
-    status:        'ongoing',
+    startTime: new Date(),
+    status: 'ongoing',
     responses,
   });
 
@@ -329,31 +359,36 @@ export const startMockTest = asyncHandler(async (req: AuthRequest, res: Response
 
   // Strip correct answers before sending to client
   const questionsForClient = questions.map(q => ({
-    _id:          q._id,
+    _id: q._id,
     questionText: q.questionText,
     questionImage: q.questionImage,
-    options:      q.options,
-    difficulty:   q.difficulty,
-    subject:      q.subject,
-    topic:        q.topic,
-    marks:        q.marks,
+    options: q.options,
+    difficulty: q.difficulty,
+    subject: q.subject,
+    topic: q.topic,
+    marks: q.marks,
     negativeMarks: q.negativeMarks,
     timeEstimate: q.timeEstimate,
   }));
 
-  ApiResponse.success(res, {
-    attempt: {
-      _id:           attempt._id,
-      attemptNumber: attempt.attemptNumber,
-      startTime:     attempt.startTime,
-      duration:      test.duration,
-      totalQuestions: test.totalQuestions,
-      totalMarks:    test.totalMarks,
+  ApiResponse.success(
+    res,
+    {
+      attempt: {
+        _id: attempt._id,
+        attemptNumber: attempt.attemptNumber,
+        startTime: attempt.startTime,
+        duration: test.duration,
+        totalQuestions: test.totalQuestions,
+        totalMarks: test.totalMarks,
+      },
+      questions: questionsForClient,
+      instructions: test.instructions,
+      isResumed: false,
     },
-    questions: questionsForClient,
-    instructions: test.instructions,
-    isResumed: false,
-  }, 'Test started successfully', 201);
+    'Test started successfully',
+    201
+  );
 });
 
 /**
@@ -365,36 +400,38 @@ export const saveAnswer = asyncHandler(async (req: AuthRequest, res: Response) =
   const { attemptId, questionNumber, userAnswer, timeSpent, markedForReview } = req.body;
 
   const attempt = await TestAttempt.findOne({
-    _id:     attemptId,
-    user:    req.user!._id,
-    status:  'ongoing',
+    _id: attemptId,
+    user: req.user!._id,
+    status: 'ongoing',
   });
 
   if (!attempt) throw new ApiError('Active attempt not found', 404);
 
   // Find the response entry
-  const responseIndex = attempt.responses.findIndex(
-    r => r.questionNumber === questionNumber
-  );
+  const responseIndex = attempt.responses.findIndex(r => r.questionNumber === questionNumber);
   if (responseIndex === -1) throw new ApiError('Question not found in attempt', 404);
 
   // Fetch correct answer
-  const question = await Question.findById(attempt.responses[responseIndex].question)
-    .select('correctOption marks negativeMarks');
+  const question = await Question.findById(attempt.responses[responseIndex].question).select(
+    'correctOption marks negativeMarks'
+  );
 
   if (!question) throw new ApiError('Question not found', 404);
 
-  const isCorrect = userAnswer !== undefined && userAnswer !== null
-    ? userAnswer === question.correctOption
-    : undefined;
+  const isCorrect =
+    userAnswer !== undefined && userAnswer !== null
+      ? userAnswer === question.correctOption
+      : undefined;
 
-  attempt.responses[responseIndex].userAnswer      = userAnswer;
-  attempt.responses[responseIndex].isCorrect       = isCorrect;
-  attempt.responses[responseIndex].timeSpent       = timeSpent || 0;
+  attempt.responses[responseIndex].userAnswer = userAnswer;
+  attempt.responses[responseIndex].isCorrect = isCorrect;
+  attempt.responses[responseIndex].timeSpent = timeSpent || 0;
   attempt.responses[responseIndex].markedForReview = markedForReview ?? false;
-  attempt.responses[responseIndex].marks           = isCorrect
+  attempt.responses[responseIndex].marks = isCorrect
     ? question.marks
-    : (userAnswer !== undefined ? -(question.negativeMarks || 0) : 0);
+    : userAnswer !== undefined
+      ? -(question.negativeMarks || 0)
+      : 0;
 
   await attempt.save();
 
@@ -411,8 +448,8 @@ export const submitMockTest = asyncHandler(async (req: AuthRequest, res: Respons
   const userId = req.user!._id;
 
   const attempt = await TestAttempt.findOne({
-    _id:    attemptId,
-    user:   userId,
+    _id: attemptId,
+    user: userId,
     status: 'ongoing',
   });
   if (!attempt) throw new ApiError('Active attempt not found', 404);
@@ -421,20 +458,21 @@ export const submitMockTest = asyncHandler(async (req: AuthRequest, res: Respons
   if (!mockTest) throw new ApiError('Mock test not found', 404);
 
   // Mark attempt submitted
-  attempt.status    = 'submitted';
-  attempt.endTime   = new Date();
-  attempt.timeTaken = timeTaken || Math.ceil(
-    (Date.now() - attempt.startTime.getTime()) / 60000
-  );
+  attempt.status = 'submitted';
+  attempt.endTime = new Date();
+  attempt.timeTaken = timeTaken || Math.ceil((Date.now() - attempt.startTime.getTime()) / 60000);
 
   // Recalculate totals
-  attempt.totalCorrect     = attempt.responses.filter(r => r.isCorrect).length;
-  attempt.totalIncorrect   = attempt.responses.filter(r => r.userAnswer !== undefined && !r.isCorrect).length;
+  attempt.totalCorrect = attempt.responses.filter(r => r.isCorrect).length;
+  attempt.totalIncorrect = attempt.responses.filter(
+    r => r.userAnswer !== undefined && !r.isCorrect
+  ).length;
   attempt.totalUnattempted = attempt.responses.filter(r => r.userAnswer === undefined).length;
-  attempt.totalScore       = attempt.responses.reduce((sum, r) => sum + (r.marks || 0), 0);
-  attempt.accuracy         = (attempt.totalCorrect + attempt.totalIncorrect) > 0
-    ? Math.round((attempt.totalCorrect / (attempt.totalCorrect + attempt.totalIncorrect)) * 100)
-    : 0;
+  attempt.totalScore = attempt.responses.reduce((sum, r) => sum + (r.marks || 0), 0);
+  attempt.accuracy =
+    attempt.totalCorrect + attempt.totalIncorrect > 0
+      ? Math.round((attempt.totalCorrect / (attempt.totalCorrect + attempt.totalIncorrect)) * 100)
+      : 0;
 
   await attempt.save();
 
@@ -446,13 +484,14 @@ export const submitMockTest = asyncHandler(async (req: AuthRequest, res: Respons
     .select('finalScore timeTaken')
     .sort('-finalScore');
 
-  const scores         = allResults.map(r => r.finalScore);
-  const averageScore   = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
-  const topScore       = scores[0] || 0;
-  const top10Index     = Math.ceil(scores.length * 0.1) - 1;
-  const top10Cutoff    = scores[top10Index] || 0;
-  const aboveAverage   = scores.filter(s => s > averageScore).length;
-  const gapToTop10     = Math.max(0, top10Cutoff - computed.finalScore);
+  const scores = allResults.map(r => r.finalScore);
+  const averageScore =
+    scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+  const topScore = scores[0] || 0;
+  const top10Index = Math.ceil(scores.length * 0.1) - 1;
+  const top10Cutoff = scores[top10Index] || 0;
+  const aboveAverage = scores.filter(s => s > averageScore).length;
+  const gapToTop10 = Math.max(0, top10Cutoff - computed.finalScore);
 
   // ── Rank ──
   const isFirstAttempt = attempt.attemptNumber === 1;
@@ -464,14 +503,14 @@ export const submitMockTest = asyncHandler(async (req: AuthRequest, res: Respons
 
   // ── Save Result ──
   const result = await Result.create({
-    user:          userId,
-    mockTest:      attempt.mockTest,
-    testAttempt:   attempt._id,
+    user: userId,
+    mockTest: attempt.mockTest,
+    testAttempt: attempt._id,
     attemptNumber: attempt.attemptNumber,
     ...computed,
     rank,
     isFirstAttempt,
-    rankLocked:       isFirstAttempt,
+    rankLocked: isFirstAttempt,
     totalParticipants,
     percentile,
     comparison: { averageScore, topScore, top10Cutoff, aboveAverage, gapToTop10 },
@@ -482,22 +521,24 @@ export const submitMockTest = asyncHandler(async (req: AuthRequest, res: Respons
     await Ranking.findOneAndUpdate(
       { user: userId, mockTest: attempt.mockTest },
       {
-        result:        result._id,
+        result: result._id,
         rank,
-        score:         computed.finalScore,
-        percentage:    computed.percentage,
+        score: computed.finalScore,
+        percentage: computed.percentage,
         percentile,
-        timeTaken:     attempt.timeTaken,
+        timeTaken: attempt.timeTaken,
         attemptNumber: 1,
-        isLocked:      true,
-        lockedAt:      new Date(),
+        isLocked: true,
+        lockedAt: new Date(),
       },
       { upsert: true, new: true }
     );
 
     // Recompute all ranks for this test (shifting after new entry)
-    const allRankings = await Ranking.find({ mockTest: attempt.mockTest })
-      .sort({ score: -1, timeTaken: 1 });
+    const allRankings = await Ranking.find({ mockTest: attempt.mockTest }).sort({
+      score: -1,
+      timeTaken: 1,
+    });
 
     const bulkOps = allRankings.map((r, i) => ({
       updateOne: {
@@ -512,25 +553,29 @@ export const submitMockTest = asyncHandler(async (req: AuthRequest, res: Respons
   await User.findByIdAndUpdate(userId, {
     $inc: {
       'stats.totalTestsTaken': 1,
-      'stats.totalTimeSpent':  attempt.timeTaken,
+      'stats.totalTimeSpent': attempt.timeTaken,
     },
   });
 
-  ApiResponse.success(res, {
-    resultId:       result._id,
-    attemptId:      attempt._id,
-    score:          computed.finalScore,
-    totalMarks:     mockTest.totalMarks,
-    percentage:     computed.percentage,
-    rank,
-    percentile,
-    totalParticipants,
-    correct:        computed.correct,
-    incorrect:      computed.incorrect,
-    unattempted:    computed.unattempted,
-    accuracy:       computed.accuracy,
-    timeTaken:      attempt.timeTaken,
-  }, 'Test submitted successfully');
+  ApiResponse.success(
+    res,
+    {
+      resultId: result._id,
+      attemptId: attempt._id,
+      score: computed.finalScore,
+      totalMarks: mockTest.totalMarks,
+      percentage: computed.percentage,
+      rank,
+      percentile,
+      totalParticipants,
+      correct: computed.correct,
+      incorrect: computed.incorrect,
+      unattempted: computed.unattempted,
+      accuracy: computed.accuracy,
+      timeTaken: attempt.timeTaken,
+    },
+    'Test submitted successfully'
+  );
 });
 
 /**
@@ -540,10 +585,12 @@ export const submitMockTest = asyncHandler(async (req: AuthRequest, res: Respons
  */
 export const getMyAttempts = asyncHandler(async (req: AuthRequest, res: Response) => {
   const attempts = await TestAttempt.find({
-    user:     req.user!._id,
+    user: req.user!._id,
     mockTest: req.params.id,
-    status:   { $ne: 'ongoing' },
-  }).sort('-createdAt').select('-responses');
+    status: { $ne: 'ongoing' },
+  })
+    .sort('-createdAt')
+    .select('-responses');
 
   ApiResponse.success(res, attempts, 'Attempts fetched successfully');
 });
@@ -565,7 +612,8 @@ export const createMockTest = asyncHandler(async (req: AuthRequest, res: Respons
  */
 export const updateMockTest = asyncHandler(async (req: AuthRequest, res: Response) => {
   const test = await MockTest.findByIdAndUpdate(req.params.id, req.body, {
-    new: true, runValidators: true,
+    new: true,
+    runValidators: true,
   });
   if (!test) throw new ApiError('Mock test not found', 404);
   ApiResponse.success(res, test, 'Mock test updated successfully');
@@ -583,7 +631,13 @@ export const deleteMockTest = asyncHandler(async (req: AuthRequest, res: Respons
 });
 
 export default {
-  getAllMockTests, getMockTestById, startMockTest,
-  saveAnswer, submitMockTest, getMyAttempts,
-  createMockTest, updateMockTest, deleteMockTest,
+  getAllMockTests,
+  getMockTestById,
+  startMockTest,
+  saveAnswer,
+  submitMockTest,
+  getMyAttempts,
+  createMockTest,
+  updateMockTest,
+  deleteMockTest,
 };

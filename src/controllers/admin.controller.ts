@@ -209,7 +209,7 @@ export const getTestAnalytics = asyncHandler(async (_req: AuthRequest, res: Resp
     // Tests with lowest average score (hardest)
     Result.aggregate([
       { $group: {
-        _id:        '$mockTest',
+        _id:      '$mockTest',
         avgScore:   { $avg: '$percentage' },
         attempts:   { $sum: 1 },
         avgAccuracy: { $avg: '$accuracy' },
@@ -399,57 +399,109 @@ export const grantCredits = asyncHandler(async (req: AuthRequest, res: Response)
  * @access  Private/Admin
  */
 export const bulkUploadQuestions = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { questions, examId } = req.body;
+  console.log('🚀 BULK UPLOAD STARTED');
+  console.log('📦 Received questions:', req.body.questions?.length);
+  
+  const { examId, questions } = req.body;
 
-  if (!Array.isArray(questions) || questions.length === 0) {
-    throw new ApiError('Please provide an array of questions', 400);
+  if (!examId || !questions || !Array.isArray(questions)) {
+    throw new ApiError('examId and questions array are required', 400);
   }
-  if (!examId) throw new ApiError('examId is required', 400);
-  if (questions.length > 500) throw new ApiError('Maximum 500 questions per upload', 400);
 
   const exam = await Exam.findById(examId);
   if (!exam) throw new ApiError('Exam not found', 404);
 
-  // Inject examId into each question
-  const prepared = questions.map((q: any, i: number) => ({
-    exam:         examId,
+  const prepared = questions.map((q: any) => ({
+    exam: examId,
     questionText: q.questionText,
-    options:      q.options,
+    questionImage: q.questionImage || null,
+    options: q.options,
     correctOption: q.correctOption,
-    solution:     q.solution || {},
-    difficulty:   q.difficulty || 'medium',
-    subject:      q.subject,
-    topic:        q.topic       || 'General',
-    subTopic:     q.subTopic    || '',
-    marks:        q.marks       || 1,
-    negativeMarks: q.negativeMarks ?? 0.25,
+    solution: q.solution,
+    explanation: q.explanation,
+    subject: q.subject,
+    topic: q.topic,
+    difficulty: q.difficulty,
+    marks: q.marks,
+    negativeMarks: q.negativeMarks,
     timeEstimate: q.timeEstimate || 60,
-    year:         q.year,
-    examType:     q.examType    || 'pyq',
-    language:     q.language    || 'english',
-    tags:         q.tags        || [],
-    isActive:     true,
-    _uploadIndex: i,
+    examType: q.examType || 'mock',
+    language: q.language || 'english',
+    tags: q.tags || [],
+    isActive: true,
   }));
 
-  const created  = await Question.insertMany(prepared, { ordered: false });
+  console.log('📝 Prepared questions:', prepared.length);
+  console.log('📝 First question sample:', JSON.stringify(prepared[0], null, 2));
 
-  // Increment pyqYearsAvailable on Exam if new years introduced
-  const years = [...new Set(
-    prepared.filter((q: any) => q.year).map((q: any) => q.year as number)
-  )];
-  if (years.length > 0) {
-    await Exam.findByIdAndUpdate(examId, {
-      $addToSet: { pyqYearsAvailable: { $each: years } },
-    });
+  let created: any[] = [];
+  const errors: any[] = [];
+
+  try {
+    created = await Question.insertMany(prepared, { ordered: false });
+    console.log('✅ Successfully inserted:', created.length);
+  } catch (err: any) {
+    console.error('❌ Raw error:', err);
+    console.error('❌ Error name:', err.name);
+    console.error('❌ Error message:', err.message);
+    
+    if (err.insertedDocs) {
+      created = err.insertedDocs;
+      console.log('✅ Partial success - inserted:', created.length);
+    }
+    
+    if (err.writeErrors) {
+      err.writeErrors.forEach((e: any) => {
+        console.error('❌ Write error:', {
+          index: e.index,
+          code: e.code,
+          errmsg: e.errmsg,
+          err: e.err
+        });
+        
+        errors.push({
+          index: e.index,
+          message: e.errmsg || e.err?.errmsg || 'Validation failed',
+          document: prepared[e.index]
+        });
+      });
+    } else if (err.errors) {
+      Object.keys(err.errors).forEach((key: string) => {
+        console.error('❌ Validation error:', key, err.errors[key].message);
+        errors.push({
+          field: key,
+          message: err.errors[key].message
+        });
+      });
+    }
+    
+    console.error('❌ Total errors:', errors.length);
+    console.error('❌ Error details:', JSON.stringify(errors, null, 2));
   }
 
-  ApiResponse.success(res, {
+  const responseData: any = {
     uploaded: created.length,
-    total:    questions.length,
+    total: questions.length,
     examId,
-    exam:     exam.name,
-  }, `${created.length} questions uploaded successfully`, 201);
+    exam: exam.name,
+  };
+
+  if (errors.length > 0) {
+    responseData.errors = errors.slice(0, 5);
+    responseData.failedCount = questions.length - created.length;
+  }
+
+  if (created.length === 0) {
+    const firstError = errors[0]?.message || 'Unknown validation error';
+    throw new ApiError(`All questions failed validation. First error: ${firstError}`, 400);
+  }
+
+  ApiResponse.success(res, responseData, 
+    created.length === questions.length 
+      ? 'All questions uploaded successfully'
+      : `Uploaded ${created.length}/${questions.length} questions. ${errors.length} failed.`,
+    201
+  );
 });
 
 /**
